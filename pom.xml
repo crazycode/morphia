@@ -184,18 +184,16 @@
 			</plugin>
 		</plugins>
 	</reporting>
-
-    <distributionManagement>
-        <repository>
-            <uniqueVersion>false</uniqueVersion>
-            <id>morphia-googlecode</id>
-            <url>svn:https://morphia.googlecode.com/svn/mavenrepo</url>
-        </repository>
-        <snapshotRepository>
-            <uniqueVersion>true</uniqueVersion>
-            <id>morphia-googlecode</id>
-            <url>svn:https://morphia.googlecode.com/svn/mavenrepo</url>
-        </snapshotRepository>
+  
+   <distributionManagement>
+      <repository>
+        <id>nexus</id>
+        <url>http://10.241.12.38:8080/nexus/content/repositories/releases/</url>
+      </repository>
+      <snapshotRepository>
+        <id>nexus</id>
+        <url>http://10.241.12.38:8080/nexus/content/repositories/snapshots/</url>
+      </snapshotRepository>
     </distributionManagement>
 
 </project>
