@@ -1,6 +1,10 @@
 package com.google.code.morphia.query;
 
+import java.util.Collection;
+
 import org.bson.types.CodeWScope;
+
+import com.mongodb.DBObject;
 
 
 
@@ -93,4 +97,9 @@ public interface Query<T> extends QueryResults<T> {
 	String toString();
 	
 	Class<T> getEntityClass();
+	
+	DBObject getQueryObject();
+
+	Query<T> or(Collection<Query<T>> queries);
+	OrBuilder<T> or();
 }

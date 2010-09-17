@@ -2,6 +2,7 @@ package com.google.code.morphia.query;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -103,6 +104,7 @@ public class QueryImpl<T> implements Query<T> {
 
 	public long countAll() {
 		DBObject query = getQueryObject();
+		
 		if (log.isTraceEnabled())
 			log.trace("Executing count(" + dbColl.getName() + ") for query: " + query);
 		return dbColl.getCount(query);
@@ -312,7 +314,33 @@ public class QueryImpl<T> implements Query<T> {
     public Query<T> where(CodeWScope cws) {
     	return filterWhere(cws);
     }
-	
+    
+    public Query<T> or(Collection<Query<T>> queries) {
+		if (query == null) {
+            query = new HashMap<String, Object>();
+        }
+
+		List<DBObject> query_objects = new ArrayList<DBObject>();
+    	
+    	for (Query<T> query: queries) {
+    		query_objects.add(query.getQueryObject());
+    	}
+    	
+    	query.put(FilterOperator.OR.val(), query_objects);
+    	return this;
+    }
+    
+    public OrBuilder<T> or() {
+		if (query == null) {
+            query = new HashMap<String, Object>();
+        }
+
+		OrBuilder<T> builder = new OrBuilder<T>(this.clazz, this.dbColl, this.ds);
+    	
+    	query.put(FilterOperator.OR.val(), builder);
+    	
+    	return builder;
+    }
 
 	public Query<T> enableValidation(){ validating = true; return this; }
 

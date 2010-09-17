@@ -23,7 +23,8 @@ public enum FilterOperator {
 	ALL("$all"),
 	ELEMENT_MATCH("$elemMatch"),
 	NOT_EQUAL("$ne"),
-	WHERE("$where");
+	WHERE("$where"),
+	OR("$or");
 	
 	private String value;
 	private FilterOperator(String val) {
