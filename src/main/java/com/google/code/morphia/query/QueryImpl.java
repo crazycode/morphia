@@ -6,12 +6,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-
 import org.bson.types.CodeWScope;
-
 import com.google.code.morphia.Datastore;
 import com.google.code.morphia.DatastoreImpl;
 import com.google.code.morphia.Key;
@@ -35,14 +34,14 @@ import com.mongodb.DBObject;
 
 /**
  * <p>Implementation of Query</p>
- * 
+ *
  * @author Scott Hernandez
  *
  * @param <T> The type we will be querying for, and returning.
  */
 public class QueryImpl<T> implements Query<T> {
 	private static final MorphiaLogger log = MorphiaLoggerFactory.get(Mapper.class);
-	
+
 	private final EntityCache cache;
 	private boolean validating = true;
 	private Map<String, Object> query = null;
@@ -55,14 +54,14 @@ public class QueryImpl<T> implements Query<T> {
 	private int limit = -1;
 	private String indexHint;
 	private Class<T> clazz = null;
-	
+
 	public QueryImpl(Class<T> clazz, DBCollection coll, Datastore ds) {
 		this.clazz = clazz;
 		this.ds = ((DatastoreImpl)ds);
 		this.dbColl = coll;
 		this.cache = this.ds.getMapper().createEntityCache();
 	}
-	
+
 	public QueryImpl(Class<T> clazz, DBCollection coll, Datastore ds, int offset, int limit) {
 		this(clazz, coll, ds);
 		this.offset = offset;
@@ -73,7 +72,7 @@ public class QueryImpl<T> implements Query<T> {
 	public void setQueryObject(DBObject query) {
 		this.query = (Map<String, Object>) query;
 	}
-	
+
 	public int getOffset() {
 		return offset;
 	}
@@ -81,39 +80,39 @@ public class QueryImpl<T> implements Query<T> {
 	public int getLimit() {
 		return limit;
 	}
-	
+
 	public DBObject getQueryObject() {
 		return (query == null) ? null : new BasicDBObject(query);
 	}
-	
+
 	public DBObject getFieldsObject() {
-		if (fields == null || fields.length == 0) 
+		if (fields == null || fields.length == 0)
 			return null;
-		
+
 		Map<String, Boolean> fieldsFilter = new HashMap<String, Boolean>();
 		for(String field : this.fields)
 			fieldsFilter.put(field, (includeFields));
-		
+
 		return new BasicDBObject(fieldsFilter);
 	}
-	
+
 	public DBObject getSortObject() {
 		return (sort == null) ? null : sort.get();
 	}
-	
+
 
 	public long countAll() {
 		DBObject query = getQueryObject();
-		
+
 		if (log.isTraceEnabled())
 			log.trace("Executing count(" + dbColl.getName() + ") for query: " + query);
 		return dbColl.getCount(query);
 	}
-	
+
 	public DBCursor prepareCursor() {
 		DBObject query = getQueryObject();
 		DBObject fields = getFieldsObject();
-		
+
 		if (log.isTraceEnabled())
 			log.trace("Running query(" + dbColl.getName() + ") : " + query + ", fields:" + fields + ",off:" + offset + ",limit:" + limit);
 
@@ -126,10 +125,10 @@ public class QueryImpl<T> implements Query<T> {
 			cursor.sort(getSortObject());
 		if (indexHint != null)
 			cursor.hint(indexHint);
-		
+
 		return cursor;
 	}
-	
+
 
 	public Iterable<T> fetch() {
 		DBCursor cursor = prepareCursor();
@@ -138,7 +137,7 @@ public class QueryImpl<T> implements Query<T> {
 
 		return new MorphiaIterator<T>(cursor, ds.getMapper(), clazz, dbColl.getName(), cache);
 	}
-	
+
 
 	public Iterable<Key<T>> fetchKeys() {
 		String[] oldFields = fields;
@@ -154,7 +153,7 @@ public class QueryImpl<T> implements Query<T> {
 		includeFields = oldInclude;
 		return new MorphiaKeyIterator<T>(cursor, ds.getMapper(), clazz, dbColl.getName());
 	}
-	
+
 
 	public List<T> asList() {
 		List<T> results = new ArrayList<T>();
@@ -167,7 +166,7 @@ public class QueryImpl<T> implements Query<T> {
 
 		return results;
 	}
-	
+
 
 	public List<Key<T>> asKeyList() {
 		List<Key<T>> results = new ArrayList<Key<T>>();
@@ -175,7 +174,7 @@ public class QueryImpl<T> implements Query<T> {
 			results.add(key);
 		return results;
 	}
-	
+
 
 	public Iterable<T> fetchEmptyEntities() {
 		String[] oldFields = fields;
@@ -187,7 +186,7 @@ public class QueryImpl<T> implements Query<T> {
 		includeFields = oldInclude;
 		return res;
 	}
-	
+
 	/**
 	 * Converts the textual operator (">", "<=", etc) into a FilterOperator.
 	 * Forgiving about the syntax; != and <> are NOT_EQUAL, = and == are EQUAL.
@@ -195,7 +194,7 @@ public class QueryImpl<T> implements Query<T> {
 	protected FilterOperator translate(String operator)
 	{
 		operator = operator.trim();
-		
+
 		if (operator.equals("=") || operator.equals("=="))
 			return FilterOperator.EQUAL;
 		else if (operator.equals(">"))
@@ -227,24 +226,25 @@ public class QueryImpl<T> implements Query<T> {
 		else
 			throw new IllegalArgumentException("Unknown operator '" + operator + "'");
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public Query<T> filter(String condition, Object value) {
 		String[] parts = condition.trim().split(" ");
 		if (parts.length < 1 || parts.length > 6)
 			throw new IllegalArgumentException("'" + condition + "' is not a legal filter condition");
-		
+
 		String prop = parts[0].trim();
 		FilterOperator op = (parts.length == 2) ? this.translate(parts[1]) : FilterOperator.EQUAL;
-		
+
 		//The field we are filtering on, in the java object
 		MappedField mf = null;
 		if (validating)
 			mf = validate(prop, value);
-		
+
 		//TODO differentiate between the key/value for maps; we will just get the mf for the field, not which part we are looking for
-		
-		if (query == null) query = new HashMap<String, Object>();
+
+        if (query == null)
+            query = new LinkedHashMap<String, Object>();
 		Mapper mapr = ds.getMapper();
 		Object mappedValue;
 		MappedClass mc = null;
@@ -258,7 +258,7 @@ public class QueryImpl<T> implements Query<T> {
 			//Ignore these. It is likely they related to mapping validation that is unimportant for queries (the query will fail/return-empty anyway)
 			log.debug("Error during mapping filter criteria: ", e);
 		}
-	
+
 		//convert the value to Key (DBRef) if it is a entity/@Reference or the field type is Key
 		if ((mf!=null && (mf.hasAnnotation(Reference.class) || mf.getType().isAssignableFrom(Key.class)))
 				|| (mc != null && mc.getEntityAnnotation() != null)) {
@@ -280,28 +280,28 @@ public class QueryImpl<T> implements Query<T> {
 			mappedValue = mapr.toMongoObject(value);
 		}
 		Class<?> type = (mappedValue != null) ? mappedValue.getClass() : null;
-		
+
 		//convert single values into lists for $in/$nin
 		if (type != null && (op == FilterOperator.IN || op == FilterOperator.NOT_IN) && !type.isArray() && !ReflectionUtils.implementsAnyInterface(type, Iterable.class) ) {
 			mappedValue = Collections.singletonList(mappedValue);
 		}
-		
+
 		if (FilterOperator.EQUAL.equals(op))
 			query.put(prop, mappedValue); // no operator, prop equals value
 		else {
 			Object inner = query.get(prop); // operator within inner object
 			if (!(inner instanceof Map)) {
-				inner = new HashMap<String, Object>();
+                inner = new LinkedHashMap<String, Object>();
 				query.put(prop, inner);
 			}
 			((Map<String, Object>)inner).put(op.val(), mappedValue);
 		}
-		return this;	
+		return this;
 	}
 
     protected Query<T> filterWhere(Object obj){
 		if (query == null) {
-            query = new HashMap<String, Object>();
+            query = new LinkedHashMap<String, Object>();
         }
         query.put(FilterOperator.WHERE.val(), obj);
         return this;
@@ -314,38 +314,38 @@ public class QueryImpl<T> implements Query<T> {
     public Query<T> where(CodeWScope cws) {
     	return filterWhere(cws);
     }
-    
+
     public Query<T> or(Collection<Query<T>> queries) {
 		if (query == null) {
-            query = new HashMap<String, Object>();
+            query = new LinkedHashMap<String, Object>();
         }
 
 		List<DBObject> query_objects = new ArrayList<DBObject>();
-    	
+
     	for (Query<T> query: queries) {
     		query_objects.add(query.getQueryObject());
     	}
-    	
+
     	query.put(FilterOperator.OR.val(), query_objects);
     	return this;
     }
-    
+
     public OrBuilder<T> or() {
 		if (query == null) {
-            query = new HashMap<String, Object>();
+            query = new LinkedHashMap<String, Object>();
         }
 
 		OrBuilder<T> builder = new OrBuilder<T>(this.clazz, this.dbColl, this.ds);
-    	
+
     	query.put(FilterOperator.OR.val(), builder);
-    	
+
     	return builder;
     }
 
 	public Query<T> enableValidation(){ validating = true; return this; }
 
 	public Query<T> disableValidation(){ validating = false; return this; }
-	
+
 	/** Validate the path, and value type, returning the mappedfield for the field at the path */
 	private MappedField validate(String prop, Object value) {
 		String[] parts = prop.split("\\.");
@@ -356,7 +356,7 @@ public class QueryImpl<T> implements Query<T> {
 		for(int i=0; ; ) {
 			String part = parts[i];
 			mf = mc.getMappedField(part);
-			
+
 			if (mf == null) {
 				mf = mc.getMappedFieldByJavaField(part);
 				if (mf != null)
@@ -373,14 +373,14 @@ public class QueryImpl<T> implements Query<T> {
 			//catch people trying to search into @Reference/@Serialized fields
 			if (i < parts.length && !canQueryPast(mf))
 				throw new QueryException("Can not use dot-notation past '" + part + "' could not be found in '" + this.clazz.getName()+ "' while validating - " + prop);
-			
+
 			if (i >= parts.length) break;
 			mc = ds.getMapper().getMappedClass((mf.isSingleValue()) ? mf.getType() : mf.getSubType());
 		}
-		
-		if (	 (mf.isSingleValue() && !isCompatibleForQuery(mf.getType(), value)) || 
+
+		if (	 (mf.isSingleValue() && !isCompatibleForQuery(mf.getType(), value)) ||
 				((mf.isMultipleValues() && !isCompatibleForQuery(mf.getSubType(), value)))) {
-				
+
 			Throwable t = new Throwable();
 			StackTraceElement ste = getFirstClientLine(t);
 			if (log.isWarningEnabled())
@@ -390,29 +390,29 @@ public class QueryImpl<T> implements Query<T> {
 			if (log.isDebugEnabled())
 				log.debug("Location of warning:\r\n", t);
 		}
-		
+
 		return mf;
 	}
-	
+
 	/** Returns if the MappedField is a Reference or Serilized  */
 	public static boolean canQueryPast(MappedField mf) {
 		return !(mf.hasAnnotation(Reference.class) || mf.hasAnnotation(Serialized.class));
 	}
-	
+
 	/** Return the first {@link StackTraceElement} not in our code (package). */
 	public static StackTraceElement getFirstClientLine(Throwable t) {
 		for(StackTraceElement ste : t.getStackTrace())
-			if ( 	!ste.getClassName().startsWith("com.google.code.morphia") && 
-					!ste.getClassName().startsWith("sun.reflect") && 
-					!ste.getClassName().startsWith("org.junit") && 
-					!ste.getClassName().startsWith("org.eclipse") && 
+			if ( 	!ste.getClassName().startsWith("com.google.code.morphia") &&
+					!ste.getClassName().startsWith("sun.reflect") &&
+					!ste.getClassName().startsWith("org.junit") &&
+					!ste.getClassName().startsWith("org.eclipse") &&
 					!ste.getClassName().startsWith("java.lang"))
 				return ste;
-		
+
 		return null;
 	}
 	public static boolean isCompatibleForQuery(Class<?> type, Object value) {
-		if (value == null || type == null) 
+		if (value == null || type == null)
 			return true;
 		else if (value instanceof Integer && (int.class.equals(type) || long.class.equals(type) || Long.class.equals(type)))
 			return true;
@@ -439,7 +439,7 @@ public class QueryImpl<T> implements Query<T> {
 		limit = oldLimit;
 		return (it.hasNext()) ? it.next() : null ;
 	}
-	
+
 
 	public Key<T> getKey() {
 		int oldLimit = limit;
@@ -448,13 +448,13 @@ public class QueryImpl<T> implements Query<T> {
 		limit = oldLimit;
 		return (it.hasNext()) ?  it.next() : null;
 	}
-	
+
 
 	public Query<T> limit(int value) {
 		this.limit = value;
 		return this;
 	}
-	
+
 
 	public Query<T> skip(int value) {
 		this.offset = value;
@@ -465,7 +465,7 @@ public class QueryImpl<T> implements Query<T> {
 		this.offset = value;
 		return this;
 	}
-	
+
 
 	public Query<T> order(String condition) {
 		sort = BasicDBObjectBuilder.start();
@@ -473,29 +473,29 @@ public class QueryImpl<T> implements Query<T> {
 		for (String s : sorts) {
 			s = s.trim();
 			int dir = 1;
-			
+
 			if (s.startsWith("-"))
 			{
 				dir = -1;
 				s = s.substring(1).trim();
 			}
-			
+
 			sort = sort.add(s, dir);
 		}
 		return this;
 	}
-	
+
 
 	public Iterator<T> iterator() {
 		return fetch().iterator();
 	}
-	
+
 	public Class<T> getEntityClass() {
 		return this.clazz;
 	}
-	
+
 	public static class QueryFieldEndImpl<T> implements QueryFieldEnd<T>{
-		
+
 		protected final String fieldExpr;
 		protected final QueryImpl<T> query;
 		public QueryFieldEndImpl(String fe, QueryImpl<T> q) {this.fieldExpr = fe; this.query=q;}
@@ -505,19 +505,19 @@ public class QueryImpl<T> implements Query<T> {
 			query.filter("" + fieldExpr, Pattern.compile("^" + prefix));
 			return query;
 		}
-		
+
 		public Query<T> startsWithIgnoreCase(String prefix) {
 			Assert.parametersNotNull("prefix", prefix);
 			query.filter("" + fieldExpr, Pattern.compile("^" + prefix, Pattern.CASE_INSENSITIVE));
 			return query;
 		}
-		
+
 		public Query<T> endsWith(String suffix) {
 			Assert.parametersNotNull("suffix", suffix);
 			query.filter("" + fieldExpr, Pattern.compile(suffix + "$"));
 			return query;
 		}
-		
+
 		public Query<T> endsWithIgnoreCase(String suffix) {
 			Assert.parametersNotNull("suffix", suffix);
 			query.filter("" + fieldExpr, Pattern.compile(suffix + "$", Pattern.CASE_INSENSITIVE));
@@ -529,13 +529,13 @@ public class QueryImpl<T> implements Query<T> {
 			query.filter("" + fieldExpr, Pattern.compile(chars));
 			return query;
 		}
-		
+
 		public Query<T> containsIgnoreCase(String chars) {
 			Assert.parametersNotNull("chars", chars);
 			query.filter("" + fieldExpr, Pattern.compile(chars, Pattern.CASE_INSENSITIVE));
 			return query;
 		}
-		
+
 		public Query<T> doesNotExist() {
 			query.filter("" + fieldExpr + " exists", 0);
 			return query;
@@ -625,7 +625,7 @@ public class QueryImpl<T> implements Query<T> {
 			return query;
 		}
 	}
-	
+
 	public QueryFieldEnd<T> field(String fieldExpr) {
 		return new QueryFieldEndImpl<T>(fieldExpr, this);
 	}

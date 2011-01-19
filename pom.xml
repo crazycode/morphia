@@ -4,7 +4,7 @@
     <groupId>com.google.code.morphia</groupId>
     <artifactId>morphia</artifactId>
     <packaging>jar</packaging>
-    <version>0.95_p1</version>
+    <version>0.95_p2</version>
     <name>morphia</name>
     
     <url>http://code.google.com/p/morphia/</url>
@@ -97,8 +97,8 @@
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>1.5</source>
-                    <target>1.5</target>
+                    <source>1.6</source>
+                    <target>1.6</target>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
